@@ -1,43 +1,55 @@
+// Tempofurbo - Calendario ponti 2026
+// JavaScript volutamente semplice e commentato: niente framework, solo DOM e date native.
+
 const monthNames = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
 ];
 
-const weekdayLabels = ["L", "M", "M", "G", "V", "S", "D"];
+const weekDays = ["L", "M", "M", "G", "V", "S", "D"];
 
-const selectedDates = new Set();
-
-const yearSelect = document.getElementById("yearSelect");
-const worksSaturday = document.getElementById("worksSaturday");
 const calendarGrid = document.getElementById("calendarGrid");
 const bridgeSummary = document.getElementById("bridgeSummary");
+const yearSelect = document.getElementById("yearSelect");
+const worksSaturdayInput = document.getElementById("worksSaturday");
 
-function pad(value) {
-  return String(value).padStart(2, "0");
+let selectedButton = null;
+
+// Normalizza le date a mezzogiorno per evitare problemi di fuso/ora legale.
+function makeDate(year, monthIndex, day) {
+  return new Date(year, monthIndex, day, 12, 0, 0, 0);
 }
 
-function toKey(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+function todayDate() {
+  const now = new Date();
+  return makeDate(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-function fromKey(key) {
-  const [year, month, day] = key.split("-").map(Number);
-  return new Date(year, month - 1, day, 12);
+function dateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(date) {
+  return new Intl.DateTimeFormat("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(date);
 }
 
 function addDays(date, amount) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + amount);
-  return next;
+  const copy = makeDate(date.getFullYear(), date.getMonth(), date.getDate());
+  copy.setDate(copy.getDate() + amount);
+  return copy;
 }
 
-function formatDate(key) {
-  const date = fromKey(key);
-  return date.toLocaleDateString("it-IT", { day: "numeric", month: "long" });
-}
-
-// Algoritmo classico per calcolare la Pasqua gregoriana.
-function getEasterDate(year) {
+// Algoritmo di Pasqua gregoriana.
+// Serve per calcolare anche il Lunedì dell'Angelo.
+function easterDate(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;
@@ -50,146 +62,184 @@ function getEasterDate(year) {
   const k = c % 4;
   const l = (32 + 2 * e + 2 * i - h - k) % 7;
   const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
   const day = ((h + l - 7 * m + 114) % 31) + 1;
 
-  return new Date(year, month - 1, day, 12);
+  return makeDate(year, month, day);
 }
 
 function getItalianHolidays(year) {
-  const easter = getEasterDate(year);
+  const easter = easterDate(year);
   const easterMonday = addDays(easter, 1);
 
   const holidays = [
-    { key: `${year}-01-01`, name: "Capodanno" },
-    { key: `${year}-01-06`, name: "Epifania" },
-    { key: toKey(easterMonday), name: "Lunedì dell’Angelo" },
-    { key: `${year}-04-25`, name: "Liberazione" },
-    { key: `${year}-05-01`, name: "Festa del lavoro" },
-    { key: `${year}-06-02`, name: "Festa della Repubblica" },
-    { key: `${year}-08-15`, name: "Ferragosto" },
-    { key: `${year}-11-01`, name: "Ognissanti" },
-    { key: `${year}-12-08`, name: "Immacolata" },
-    { key: `${year}-12-25`, name: "Natale" },
-    { key: `${year}-12-26`, name: "Santo Stefano" }
+    { date: makeDate(year, 0, 1), name: "Capodanno" },
+    { date: makeDate(year, 0, 6), name: "Epifania" },
+    { date: easter, name: "Pasqua" },
+    { date: easterMonday, name: "Lunedì dell’Angelo" },
+    { date: makeDate(year, 3, 25), name: "Festa della Liberazione" },
+    { date: makeDate(year, 4, 1), name: "Festa del lavoro" },
+    { date: makeDate(year, 5, 2), name: "Festa della Repubblica" },
+    { date: makeDate(year, 7, 15), name: "Ferragosto" },
+    { date: makeDate(year, 10, 1), name: "Ognissanti" },
+    { date: makeDate(year, 11, 8), name: "Immacolata" },
+    { date: makeDate(year, 11, 25), name: "Natale" },
+    { date: makeDate(year, 11, 26), name: "Santo Stefano" }
   ];
 
-  return holidays;
+  const map = new Map();
+  holidays.forEach((holiday) => {
+    map.set(dateKey(holiday.date), holiday.name);
+  });
+
+  return { holidays, map };
 }
 
-function isWeekend(date, saturdayIsWorking) {
-  const day = date.getDay();
-  if (saturdayIsWorking) {
-    return day === 0;
+function isWeekend(date, worksSaturday) {
+  const day = date.getDay(); // 0 domenica, 6 sabato
+  return worksSaturday ? day === 0 : day === 0 || day === 6;
+}
+
+function isWorkingDay(date, worksSaturday, holidayMap) {
+  return !isWeekend(date, worksSaturday) && !holidayMap.has(dateKey(date));
+}
+
+// Conta il blocco di giorni liberi consecutivi generato da ferie consigliate + festività + weekend.
+function countFreeBlock(seedDate, recommendedKeys, holidayMap, worksSaturday) {
+  function isFree(date) {
+    const key = dateKey(date);
+    return recommendedKeys.has(key) || holidayMap.has(key) || isWeekend(date, worksSaturday);
   }
-  return day === 0 || day === 6;
-}
 
-function isWorkingDay(key, holidayKeys, saturdayIsWorking) {
-  const date = fromKey(key);
-  return !holidayKeys.has(key) && !isWeekend(date, saturdayIsWorking);
-}
-
-function getDateRange(start, end) {
-  const dates = [];
-  let cursor = new Date(start);
-
-  while (cursor <= end) {
-    dates.push(toKey(cursor));
-    cursor = addDays(cursor, 1);
+  let start = makeDate(seedDate.getFullYear(), seedDate.getMonth(), seedDate.getDate());
+  while (isFree(addDays(start, -1))) {
+    start = addDays(start, -1);
   }
 
-  return dates;
+  let end = makeDate(seedDate.getFullYear(), seedDate.getMonth(), seedDate.getDate());
+  while (isFree(addDays(end, 1))) {
+    end = addDays(end, 1);
+  }
+
+  const days = Math.round((end - start) / 86400000) + 1;
+  return { start, end, days };
 }
 
-function calculateBridgeSuggestions(year, saturdayIsWorking) {
-  const holidays = getItalianHolidays(year);
-  const holidayKeys = new Set(holidays.map(item => item.key));
+function uniqueDates(dates) {
+  const seen = new Set();
+  return dates.filter((date) => {
+    const key = dateKey(date);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// Genera suggerimenti semplici ma solidi.
+// Caso martedì: lunedì precedente.
+// Caso giovedì: venerdì successivo.
+// Se si lavora anche il sabato, aggiunge anche il sabato quando serve per non spezzare il ponte.
+function getBridgeSuggestions(year, worksSaturday, holidayMap) {
+  const { holidays } = getItalianHolidays(year);
+  const today = todayDate();
   const suggestions = [];
 
-  holidays.forEach(holiday => {
-    const holidayDate = fromKey(holiday.key);
-    let best = null;
+  holidays.forEach((holiday) => {
+    const dow = holiday.date.getDay();
+    let recommended = [];
 
-    for (let before = 0; before <= 4; before += 1) {
-      for (let after = 0; after <= 4; after += 1) {
-        const start = addDays(holidayDate, -before);
-        const end = addDays(holidayDate, after);
-        const range = getDateRange(start, end);
+    if (dow === 2) { // martedì
+      recommended.push(addDays(holiday.date, -1));
 
-        const vacationDays = range.filter(key => isWorkingDay(key, holidayKeys, saturdayIsWorking));
-        const totalDays = range.length;
-
-        // Escludiamo i suggerimenti troppo deboli: devono produrre almeno 4 giorni consecutivi.
-        if (totalDays < 4 || vacationDays.length === 0 || vacationDays.length > 4) {
-          continue;
-        }
-
-        const score = totalDays / vacationDays.length;
-
-        if (!best || score > best.score || (score === best.score && totalDays > best.totalDays)) {
-          best = {
-            holidayName: holiday.name,
-            holidayKey: holiday.key,
-            startKey: toKey(start),
-            endKey: toKey(end),
-            vacationDays,
-            totalDays,
-            score
-          };
-        }
+      if (worksSaturday) {
+        recommended.push(addDays(holiday.date, -3)); // sabato precedente
       }
     }
 
-    if (best) {
-      suggestions.push(best);
+    if (dow === 4) { // giovedì
+      recommended.push(addDays(holiday.date, 1));
+
+      if (worksSaturday) {
+        recommended.push(addDays(holiday.date, 2)); // sabato successivo
+      }
     }
+
+    if (dow === 5) { // venerdì: weekend lungo naturale, ma giovedì può allungare
+      recommended.push(addDays(holiday.date, -1));
+    }
+
+    if (dow === 1) { // lunedì: weekend lungo naturale, ma martedì può allungare
+      recommended.push(addDays(holiday.date, 1));
+    }
+
+    recommended = uniqueDates(recommended)
+      .filter((date) => date.getFullYear() === year)
+      .filter((date) => isWorkingDay(date, worksSaturday, holidayMap))
+      .filter((date) => date >= today);
+
+    if (recommended.length === 0) {
+      return;
+    }
+
+    const recommendedKeys = new Set(recommended.map(dateKey));
+    const block = countFreeBlock(holiday.date, recommendedKeys, holidayMap, worksSaturday);
+    const leaveDays = recommended.length;
+    const ratio = block.days / leaveDays;
+
+    // Evita suggerimenti deboli.
+    if (block.days < 3) {
+      return;
+    }
+
+    suggestions.push({
+      holiday,
+      recommended,
+      block,
+      leaveDays,
+      ratio,
+      isBest: ratio >= 4 || (block.days >= 4 && leaveDays === 1)
+    });
   });
 
-  return suggestions
-    .sort((a, b) => b.score - a.score || b.totalDays - a.totalDays)
-    .slice(0, 6);
-}
-
-function getRecommendedDateSets(suggestions) {
-  const recommended = new Set();
-  const topDays = new Set();
-  const topMonths = new Set();
-
-  suggestions.slice(0, 4).forEach((suggestion, index) => {
-    suggestion.vacationDays.forEach(key => recommended.add(key));
-
-    if (index < 3) {
-      getDateRange(fromKey(suggestion.startKey), fromKey(suggestion.endKey)).forEach(key => topDays.add(key));
-      topMonths.add(fromKey(suggestion.holidayKey).getMonth());
-    }
+  return suggestions.sort((a, b) => {
+    if (b.isBest !== a.isBest) return Number(b.isBest) - Number(a.isBest);
+    if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+    return a.holiday.date - b.holiday.date;
   });
-
-  return { recommended, topDays, topMonths };
 }
 
-function renderSummary(suggestions) {
+function renderBridgeSummary(suggestions) {
   bridgeSummary.innerHTML = "";
 
-  if (!suggestions.length) {
-    bridgeSummary.innerHTML = `<article class="summary-card"><h3>Nessun ponte forte trovato</h3><p>Per questo anno le festività cadono in modo poco favorevole.</p></article>`;
+  if (suggestions.length === 0) {
+    bridgeSummary.innerHTML = `
+      <div class="empty-state">
+        Nessun ponte futuro particolarmente conveniente trovato con queste impostazioni.
+        Le festività restano comunque evidenziate nel calendario.
+      </div>
+    `;
     return;
   }
 
-  suggestions.slice(0, 3).forEach((suggestion, index) => {
+  suggestions.slice(0, 6).forEach((suggestion) => {
     const card = document.createElement("article");
-    card.className = `summary-card ${index === 0 ? "top" : ""}`;
+    card.className = "bridge-card";
 
-    const vacationText = suggestion.vacationDays.map(formatDate).join(", ");
+    const recommendedList = suggestion.recommended
+      .map((date) => formatDate(date))
+      .join(", ");
 
     card.innerHTML = `
-      <div class="summary-meta">
-        <span class="pill yellow">${index === 0 ? "Ponte top" : "Occasione"}</span>
-        <span class="pill green">${suggestion.vacationDays.length} ferie → ${suggestion.totalDays} giorni</span>
+      <h3>${suggestion.holiday.name}</h3>
+      <p>
+        Prendi ferie: <strong>${recommendedList}</strong>.<br>
+        Ottieni circa <strong>${suggestion.block.days} giorni liberi consecutivi</strong>
+        usando <strong>${suggestion.leaveDays} ${suggestion.leaveDays === 1 ? "giorno" : "giorni"} di ferie</strong>.
+      </p>
+      <div class="bridge-meta">
+        ${suggestion.isBest ? `<span class="badge badge-yellow">Ponte vantaggioso</span>` : `<span class="badge badge-green">Ferie consigliate</span>`}
+        <span class="badge badge-blue">${formatDate(suggestion.block.start)} → ${formatDate(suggestion.block.end)}</span>
       </div>
-      <h3>${suggestion.holidayName}</h3>
-      <p>Periodo: ${formatDate(suggestion.startKey)} - ${formatDate(suggestion.endKey)}.</p>
-      <p>Giorni suggeriti: ${vacationText}.</p>
     `;
 
     bridgeSummary.appendChild(card);
@@ -198,96 +248,136 @@ function renderSummary(suggestions) {
 
 function renderCalendar() {
   const year = Number(yearSelect.value);
-  const saturdayIsWorking = worksSaturday.checked;
-  const holidays = getItalianHolidays(year);
-  const holidayMap = new Map(holidays.map(item => [item.key, item.name]));
-  const suggestions = calculateBridgeSuggestions(year, saturdayIsWorking);
-  const { recommended, topDays, topMonths } = getRecommendedDateSets(suggestions);
+  const worksSaturday = worksSaturdayInput.checked;
+  const today = todayDate();
 
-  renderSummary(suggestions);
+  const { map: holidayMap } = getItalianHolidays(year);
+  const suggestions = getBridgeSuggestions(year, worksSaturday, holidayMap);
+
+  const recommendedMap = new Map();
+  const bestMonths = new Set();
+
+  suggestions.forEach((suggestion) => {
+    if (suggestion.isBest) {
+      bestMonths.add(suggestion.holiday.date.getMonth());
+    }
+
+    suggestion.recommended.forEach((date) => {
+      recommendedMap.set(dateKey(date), {
+        label: `Ferie consigliate per ${suggestion.holiday.name}`,
+        best: suggestion.isBest
+      });
+    });
+  });
+
+  renderBridgeSummary(suggestions);
+
   calendarGrid.innerHTML = "";
 
   for (let month = 0; month < 12; month += 1) {
     const monthCard = document.createElement("article");
-    monthCard.className = `month-card ${topMonths.has(month) ? "has-top-bridge" : ""}`;
+    monthCard.className = "month-card";
+    if (bestMonths.has(month)) {
+      monthCard.classList.add("has-best-bridge");
+    }
 
-    const monthHead = document.createElement("div");
-    monthHead.className = "month-head";
-    monthHead.innerHTML = `
-      <h3>${monthNames[month]} ${year}</h3>
-      ${topMonths.has(month) ? `<span class="month-badge">Ponte vantaggioso</span>` : ""}
+    const monthHeader = document.createElement("div");
+    monthHeader.className = "month-header";
+    monthHeader.innerHTML = `
+      <h3>${monthNames[month]}</h3>
+      ${bestMonths.has(month) ? `<span class="month-tag">Ponte top</span>` : ""}
     `;
 
     const weekdays = document.createElement("div");
     weekdays.className = "weekdays";
-    weekdays.innerHTML = weekdayLabels.map(day => `<span>${day}</span>`).join("");
+    weekDays.forEach((day) => {
+      const span = document.createElement("span");
+      span.textContent = day;
+      weekdays.appendChild(span);
+    });
 
-    const days = document.createElement("div");
-    days.className = "days";
+    const daysGrid = document.createElement("div");
+    daysGrid.className = "days-grid";
 
-    const firstDay = new Date(year, month, 1, 12);
-    const lastDay = new Date(year, month + 1, 0, 12);
-    const mondayBasedStart = (firstDay.getDay() + 6) % 7;
+    // Offset: in JS domenica è 0, lunedì è 1.
+    // Qui vogliamo il lunedì come prima colonna.
+    const firstDay = makeDate(year, month, 1);
+    const offset = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    for (let i = 0; i < mondayBasedStart; i += 1) {
-      const empty = document.createElement("button");
+    for (let i = 0; i < offset; i += 1) {
+      const empty = document.createElement("div");
       empty.className = "day empty";
-      empty.type = "button";
-      days.appendChild(empty);
+      daysGrid.appendChild(empty);
     }
 
-    for (let day = 1; day <= lastDay.getDate(); day += 1) {
-      const date = new Date(year, month, day, 12);
-      const key = toKey(date);
+    const dayInfo = document.createElement("div");
+    dayInfo.className = "day-info";
+    dayInfo.textContent = "Clicca su un giorno evidenziato per leggere il dettaglio.";
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = makeDate(year, month, day);
+      const key = dateKey(date);
       const button = document.createElement("button");
-      const classes = ["day"];
-
-      if (isWeekend(date, saturdayIsWorking)) classes.push("weekend");
-      if (holidayMap.has(key)) classes.push("holiday");
-      if (recommended.has(key)) classes.push("recommended");
-      if (topDays.has(key)) classes.push("top-day");
-      if (selectedDates.has(key)) classes.push("selected");
-
-      button.className = classes.join(" ");
+      button.className = "day";
       button.type = "button";
       button.textContent = day;
-      button.title = holidayMap.get(key) || key;
-      button.setAttribute("aria-label", holidayMap.get(key) ? `${day} ${monthNames[month]}: ${holidayMap.get(key)}` : `${day} ${monthNames[month]}`);
+      button.setAttribute("aria-label", formatDate(date));
+
+      const labels = [];
+
+      if (date < today) {
+        button.classList.add("past");
+      }
+
+      if (isWeekend(date, worksSaturday)) {
+        button.classList.add("weekend");
+        labels.push("Weekend");
+      }
+
+      if (holidayMap.has(key)) {
+        button.classList.add("holiday");
+        labels.push(holidayMap.get(key));
+      }
+
+      if (recommendedMap.has(key)) {
+        const recommendation = recommendedMap.get(key);
+        button.classList.add("recommended");
+        labels.push(recommendation.label);
+
+        if (recommendation.best) {
+          button.classList.add("best");
+        }
+      }
 
       button.addEventListener("click", () => {
-        if (selectedDates.has(key)) {
-          selectedDates.delete(key);
-        } else {
-          selectedDates.add(key);
+        if (selectedButton) {
+          selectedButton.classList.remove("selected");
         }
-        renderCalendar();
+
+        selectedButton = button;
+        button.classList.add("selected");
+
+        if (labels.length === 0) {
+          dayInfo.innerHTML = `<strong>${formatDate(date)}</strong>: nessuna evidenza particolare.`;
+          return;
+        }
+
+        dayInfo.innerHTML = `<strong>${formatDate(date)}</strong>: ${labels.join(" · ")}.`;
       });
 
-      days.appendChild(button);
+      daysGrid.appendChild(button);
     }
 
-    const note = document.createElement("p");
-    note.className = "calendar-note";
-    note.textContent = topMonths.has(month)
-      ? "Mese con almeno un ponte interessante: controlla i giorni verdi e gialli."
-      : "";
-
-    monthCard.appendChild(monthHead);
+    monthCard.appendChild(monthHeader);
     monthCard.appendChild(weekdays);
-    monthCard.appendChild(days);
-    if (note.textContent) monthCard.appendChild(note);
+    monthCard.appendChild(daysGrid);
+    monthCard.appendChild(dayInfo);
     calendarGrid.appendChild(monthCard);
   }
 }
 
-yearSelect.addEventListener("change", () => {
-  selectedDates.clear();
-  renderCalendar();
-});
-
-worksSaturday.addEventListener("change", () => {
-  selectedDates.clear();
-  renderCalendar();
-});
+worksSaturdayInput.addEventListener("change", renderCalendar);
+yearSelect.addEventListener("change", renderCalendar);
 
 renderCalendar();
