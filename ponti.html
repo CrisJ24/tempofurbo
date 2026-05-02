@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Ponti 2026: calendario festività e ferie consigliate | Tempofurbo</title>
+  <meta name="description" content="Consulta il calendario dei ponti 2026 in Italia e scopri quali giorni di ferie conviene prendere per ottenere più giorni liberi." />
+
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <main class="page">
+    <section class="tool-hero">
+      <header class="header">
+        <a href="index.html" class="logo">Tempofurbo</a>
+        <nav class="nav" aria-label="Navigazione principale">
+          <a href="index.html">Home</a>
+          <a href="ponti.html" aria-current="page">Ponti</a>
+        </nav>
+      </header>
+
+      <div class="tool-hero-grid">
+        <div>
+          <p class="eyebrow">Ponti e ferie</p>
+          <h1>Ponti 2026: trova i giorni giusti da prendere.</h1>
+          <p class="subtitle">
+            Visualizza festività, weekend e ferie consigliate. Il verde indica i giorni suggeriti,
+            il blu i giorni che selezioni tu, il giallo i ponti più vantaggiosi.
+          </p>
+        </div>
+
+        <aside class="mascot-tip" aria-label="Consiglio furbo">
+          <img src="img/hero-tempofurbo.png" alt="Mascotte Tempofurbo" />
+          <div>
+            <strong>Consiglio furbo</strong>
+            <p>Parti dai mesi evidenziati: lì i giorni di ferie rendono di più.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="tool-panel" aria-label="Impostazioni calendario ponti">
+      <div class="controls">
+        <label class="control-group" for="yearSelect">
+          <span>Anno</span>
+          <select id="yearSelect">
+            <option value="2026" selected>2026</option>
+            <option value="2027">2027</option>
+          </select>
+        </label>
+
+        <label class="checkbox-card">
+          <input type="checkbox" id="worksSaturday" />
+          <span>Lavoro anche il sabato</span>
+        </label>
+      </div>
+
+      <div class="legend" aria-label="Legenda calendario">
+        <span><i class="legend-dot holiday"></i> Festività</span>
+        <span><i class="legend-dot weekend"></i> Weekend</span>
+        <span><i class="legend-dot recommended"></i> Ferie consigliate</span>
+        <span><i class="legend-dot selected"></i> Selezionato</span>
+        <span><i class="legend-dot top"></i> Ponte vantaggioso</span>
+      </div>
+    </section>
+
+    <section class="summary-section" aria-labelledby="summary-title">
+      <div class="section-heading compact">
+        <p class="eyebrow">Migliori occasioni</p>
+        <h2 id="summary-title">I ponti più interessanti</h2>
+      </div>
+      <div id="bridgeSummary" class="bridge-summary"></div>
+    </section>
+
+    <section class="calendar-section" aria-labelledby="calendar-title">
+      <div class="section-heading compact">
+        <p class="eyebrow">Calendario visuale</p>
+        <h2 id="calendar-title">Anno completo</h2>
+      </div>
+      <div id="calendarGrid" class="calendar-grid"></div>
+    </section>
+
+    <footer class="footer">
+      <p>tempofurbo.it</p>
+      <p>Pagina sperimentale: i suggerimenti sono calcolati sulle festività nazionali italiane.</p>
+    </footer>
+  </main>
+
+  <script src="js/ponti.js"></script>
+</body>
+</html>
